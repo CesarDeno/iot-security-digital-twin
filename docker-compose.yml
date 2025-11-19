@@ -1,0 +1,33 @@
+version: "3.8"
+
+services:
+   # --- BASE DE DATOS (MongoDB) ---
+   mongodb:
+      image: mongo:latest
+      container_name: mongo_iot_db
+      restart: always
+      ports:
+         - "27017:27017"
+      volumes:
+         - mongo_data:/data/db
+      environment:
+         MONGO_INITDB_ROOT_USERNAME: iot_admin
+         MONGO_INITDB_ROOT_PASSWORD: 940194
+
+   # --- BROKER MQTT (Mosquitto) ---
+   mosquitto:
+      image: eclipse-mosquitto:latest
+      container_name: mosquitto_broker
+      restart: always
+      ports:
+         - "1883:1883" # Puerto estándar para ESP32/Python
+         - "9001:9001" # Puerto para WebSockets
+      volumes:
+         - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
+         - mosquitto_data:/mosquitto/data
+         - mosquitto_log:/mosquitto/log
+
+volumes:
+   mongo_data:
+   mosquitto_data:
+   mosquitto_log:

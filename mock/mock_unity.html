@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="es">
+   <head>
+      <meta charset="UTF-8" />
+      <title>Panel de Seguridad (Gemelo Digital)</title>
+      <style>
+         body {
+            font-family: "Segoe UI", sans-serif;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+         }
+         .dashboard {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+         }
+         .card {
+            background: #2d2d2d;
+            padding: 25px;
+            border-radius: 15px;
+            width: 300px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            text-align: center;
+         }
+         h2 {
+            margin: 0 0 15px 0;
+            font-size: 1.2em;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+         }
+
+         /* Estilos de Estado */
+         .status-icon {
+            font-size: 4em;
+            margin: 10px 0;
+            transition: all 0.3s ease;
+         }
+         .status-text {
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 5px;
+         }
+         .meta-info {
+            font-size: 0.9em;
+            color: #aaa;
+            background: #333;
+            padding: 5px 10px;
+            border-radius: 20px;
+            display: inline-block;
+            margin-top: 10px;
+         }
+
+         .open {
+            color: #ff4444;
+         }
+         .closed {
+            color: #00c851;
+         }
+
+         /* Log */
+         .log-container {
+            width: 100%;
+            max-width: 640px;
+            background: #000;
+            border-radius: 10px;
+            padding: 15px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            border: 1px solid #333;
+         }
+         .log-entry {
+            border-bottom: 1px solid #222;
+            padding: 5px 0;
+            display: flex;
+            justify-content: space-between;
+         }
+         .log-time {
+            color: #666;
+            margin-right: 10px;
+         }
+         .log-msg {
+            color: #ddd;
+         }
+
+         /* Controles */
+         button {
+            padding: 12px 24px;
+            cursor: pointer;
+            background: #33b5e5;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            transition: background 0.2s;
+         }
+         button:hover {
+            background: #0099cc;
+         }
+      </style>
+   </head>
+   <body>
+      <h1>🛡️ Sistema de Control de Acceso</h1>
+
+      <div class="dashboard">
+         <!-- Gemelo Digital: Estado Puerta -->
+         <div class="card">
+            <h2>Estado de Puerta</h2>
+            <div id="icon" class="status-icon closed">🔒</div>
+            <div id="statusText" class="status-text closed">CERRADO</div>
+            <div class="meta-info">ID: <span id="devId">--</span></div>
+         </div>
+
+         <!-- Gemelo Digital: Último Acceso -->
+         <div class="card">
+            <h2>Último Acceso</h2>
+            <div style="font-size: 3em; margin: 10px 0">🔑</div>
+            <div id="method" class="status-text" style="color: #ffbb33">--</div>
+            <div class="meta-info">Método de entrada</div>
+         </div>
+      </div>
+
+      <div
+         class="card"
+         style="
+            width: 600px;
+            margin-bottom: 20px;
+            flex-direction: row;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+         "
+      >
+         <h2>Acciones Remotas</h2>
+         <button onclick="sendCommand('FORCE_LOCK')">🔒 Bloquear Sistema</button>
+         <button onclick="sendCommand('FORCE_UNLOCK')" style="background: #ff4444">🔓 Desbloqueo de Emergencia</button>
+      </div>
+
+      <h3>Registro de Eventos en Tiempo Real</h3>
+      <div id="log" class="log-container"></div>
+
+      <script>
+         const ws = new WebSocket("ws://127.0.0.1:8000/ws");
+         const logDiv = document.getElementById("log");
+
+         // Elementos UI
+         const uiIcon = document.getElementById("icon");
+         const uiText = document.getElementById("statusText");
+         const uiMethod = document.getElementById("method");
+         const uiDevId = document.getElementById("devId");
+
+         ws.onopen = () => log("✅ Conectado al Sistema de Seguridad");
+         ws.onclose = () => log("❌ Desconectado");
+
+         ws.onmessage = (event) => {
+            const msg = JSON.parse(event.data);
+
+            if (msg.type === "sensor_update") {
+               const data = msg.payload;
+               updateDashboard(data);
+
+               // Log especial para eventos
+               if (data.door_status === "OPEN") {
+                  log(`⚠️ PUERTA ABIERTA vía [${data.access_method}]`);
+               } else {
+                  log(`🔒 Puerta cerrada`);
+               }
+            }
+         };
+
+         function updateDashboard(data) {
+            uiDevId.innerText = data.device_id;
+
+            if (data.door_status === "OPEN") {
+               uiIcon.innerText = "🔓";
+               uiIcon.className = "status-icon open";
+               uiText.innerText = "ABIERTO";
+               uiText.className = "status-text open";
+               // Solo actualizamos el método si hay uno (al abrir)
+               if (data.access_method) uiMethod.innerText = data.access_method;
+            } else {
+               uiIcon.innerText = "🔒";
+               uiIcon.className = "status-icon closed";
+               uiText.innerText = "CERRADO";
+               uiText.className = "status-text closed";
+               uiMethod.innerText = "--";
+            }
+         }
+
+         function sendCommand(action) {
+            if (ws.readyState === WebSocket.OPEN) {
+               ws.send(JSON.stringify({ action: action }));
+               log(`📤 Comando enviado: ${action}`);
+            }
+         }
+
+         function log(text) {
+            const div = document.createElement("div");
+            div.className = "log-entry";
+            div.innerHTML = `<span class="log-time">${new Date().toLocaleTimeString()}</span><span class="log-msg">${text}</span>`;
+            logDiv.prepend(div);
+         }
+      </script>
+   </body>
+</html>
