@@ -1,46 +1,48 @@
-Proyecto Final Integrador: Sistema Ciberfísico y Gemelo Digital
+# Proyecto Final Integrador: Sistema Ciberfísico y Gemelo Digital
 
-Middleware IoT desarrollado en Python (FastAPI) que conecta un prototipo físico (ESP32) con un Gemelo Digital en Unity, utilizando MQTT para la transmisión de datos en tiempo real y MongoDB para el almacenamiento histórico.
+Middleware IoT desarrollado en **Python (FastAPI)** que conecta un
+prototipo físico (**ESP32**) con un **Gemelo Digital en Unity**,
+utilizando **MQTT** para transmisión en tiempo real y **MongoDB** para
+almacenamiento histórico.
 
-Instrucciones de Instalación y Ejecución
+------------------------------------------------------------------------
 
-Sigue estos pasos para levantar el entorno de desarrollo local.
+## 🚀 Instrucciones de Instalación y Ejecución
 
-1. Configuración del Entorno Python
+### 1. Configuración del Entorno Python
 
-Si es la primera vez que descargas el proyecto, crea el entorno virtual:
-
+``` bash
 python -m venv .venv
+```
 
-Activa el entorno virtual (Windows):
-
+``` bash
 .venv\Scripts\activate
+```
 
-2. Infraestructura (Docker)
+### 2. Infraestructura (Docker)
 
-Levanta los servicios de base de datos (MongoDB) y el broker de mensajería (Mosquitto):
-
+``` bash
 docker-compose up -d
+```
 
-3. Instalación de Dependencias
+### 3. Instalación de Dependencias
 
-Una vez activado el entorno virtual, instala las librerías requeridas:
-
+``` bash
 pip install -r requirements.txt
+```
 
-4. Ejecución del Middleware
+### 4. Ejecución del Middleware
 
-Navega a la carpeta de código fuente e inicia el servidor:
-
+``` bash
 cd src
-uvicorn main:app --reload
+uvicorn main:app --reload 
+```
 
-🔗 Enlaces Útiles
+------------------------------------------------------------------------
 
-API Server: http://127.0.0.1:8000
+## 🔗 Enlaces Útiles
 
-Documentación Interactiva (Swagger): http://127.0.0.1:8000/docs
-
-MongoDB (Local): mongodb://localhost:27017
-
-Broker MQTT: tcp://localhost:1883
+-   API Server: http://127.0.0.1:8000
+-   Swagger: http://127.0.0.1:8000/docs
+-   MongoDB Local: mongodb://localhost:27017
+-   Broker MQTT: tcp://localhost:1883
