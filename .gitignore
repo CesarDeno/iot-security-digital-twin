@@ -7,10 +7,6 @@ pycache/
 venv/
 *.log
 
-Variables de Entorno (SECRETOS)
-
-.env
-
 IDE
 
 .vscode/
