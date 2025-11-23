@@ -1,46 +1,49 @@
 import json
+import logging
 from datetime import datetime
 from fastapi_mqtt import FastMQTT, MQTTConfig
 from config import MQTT_BROKER, MQTT_PORT, TOPIC_TELEMETRY, TOPIC_COMMANDS
 from database import save_sensor_data
-from websocket_manager import manager
 
-# Configuración del cliente MQTT
+# Configuración de Logs
+logger = logging.getLogger("uvicorn.info")
+
+# 1. Configuración
 mqtt_config = MQTTConfig(
     host=MQTT_BROKER,
     port=MQTT_PORT,
     keepalive=60
 )
 
+# 2. Instancia del cliente
 mqtt = FastMQTT(config=mqtt_config)
 
+# 3. Función CONNECT (Se ejecuta sola al conectarse)
 @mqtt.on_connect()
 def connect(client, flags, rc, properties):
-    print(f"📡 Conectado al Broker MQTT: {MQTT_BROKER}")
-    mqtt.client.subscribe(TOPIC_TELEMETRY)
-    print(f"👂 Escuchando tema: {TOPIC_TELEMETRY}")
+    logger.info(f"✅ [BROKER] Python conectado al Broker MQTT: {MQTT_BROKER}")
 
+    
+    # Suscribirse aquí para no perder la suscripción si se reconecta
+    mqtt.client.subscribe(TOPIC_TELEMETRY, qos=0)
+    logger.info(f"✅ [BROKER] Escuchando TOPIC: {TOPIC_TELEMETRY}")
+
+# 4. Función MESSAGE (Se ejecuta sola al recibir datos)
 @mqtt.on_message()
 async def message(client, topic, payload, qos, properties):
-    try:
-        payload_str = payload.decode()
-        print(f"📥 Recibido MQTT [{topic}]: {payload_str}")
-        
-        data_json = json.loads(payload_str)
-        
-        # 1. Añadir timestamp si falta
-        if "timestamp" not in data_json:
-            data_json["timestamp"] = datetime.now()
+    if topic == TOPIC_TELEMETRY:
+        try:
+            payload_str = payload.decode()
+            logger.info(f"[MQTT HANDLER] Recibido: {payload_str}")
+            
+            data_json = json.loads(payload_str)
+            
+            if "timestamp" not in data_json:
+                data_json["timestamp"] = datetime.now()
 
-        # 2. Guardar en BD (usando la función auxiliar)
-        await save_sensor_data(data_json)
+            await save_sensor_data(data_json)
 
-        # 3. Enviar a Unity
-        msg_to_unity = {
-            "type": "sensor_update",
-            "payload": data_json
-        }
-        await manager.broadcast(msg_to_unity)
-
-    except Exception as e:
-        print(f"Error procesando mensaje MQTT: {e}")
+        except Exception as e:
+            logger.info(f"❌ [BROKER]  Error procesando mensaje MQTT: {e}")
+    else:
+        logger.info(f"❌ [BROKER] Tema desconocido: {topic}")

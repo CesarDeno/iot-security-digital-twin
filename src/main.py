@@ -1,42 +1,54 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+import sys
+import asyncio
+import logging
+from contextlib import asynccontextmanager
+from database import test_connection
+
+# --- FIX WINDOWS ---
+if sys.platform.startswith("win"):
+    try:
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    except Exception:
+        pass
+
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from mqtt_handler import mqtt, TOPIC_COMMANDS
-from websocket_manager import manager
+from mqtt_handler import mqtt
 from config import MQTT_BROKER
 
-app = FastAPI(title="Middleware IoT: MQTT + Unity")
+# Configuración de Logs
+logger = logging.getLogger("uvicorn.info")
 
-# --- FIX: Permitir conexiones desde cualquier origen (CORS) ---
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 1. Iniciar conexión MQTT explícitamente
+    logger.info("[BROKER] Iniciando cliente MQTT...")
+    await mqtt.mqtt_startup()
+    
+    # 2. Verificar base de datos
+    logger.info("[MONGO] Verificando conexión a MongoDB...")
+    await test_connection()
+    
+    logger.info("✅ [SISTEMA] Esperando mensajes...")
+    yield
+    
+    # 3. Cerrar conexión al apagar
+    await mqtt.mqtt_shutdown()
+
+app = FastAPI(title="Middleware IoT: MQTT + Mongo", lifespan=lifespan)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Permite todas las conexiones
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Inicializar MQTT con la app
-mqtt.init_app(app)
-
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    """
-    Endpoint WebSocket para Unity.
-    Maneja la conexión y reenvía comandos hacia MQTT.
-    """
-    await manager.connect(websocket)
-    try:
-        while True:
-            # Recibir comando de Unity (ej: {"action": "led_on"})
-            data = await websocket.receive_text()
-            print(f"🎮 Comando de Unity: {data}")
-            
-            # Publicar en MQTT hacia el ESP32
-            mqtt.publish(TOPIC_COMMANDS, data) 
-            
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
-
 @app.get("/")
 async def root():
-    return {"status": "System Online", "broker": MQTT_BROKER}
+    return {
+        "status": "System Online", 
+        "mode": "MQTT Listener",
+        "broker": MQTT_BROKER
+    }

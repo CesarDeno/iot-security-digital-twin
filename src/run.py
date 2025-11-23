@@ -1,18 +1,21 @@
-import uvicorn
-import asyncio
 import sys
+import asyncio
+
+# Forza la política de eventos SelectorEventLoop antes de cargar cualquier otra librería.
+if sys.platform.startswith('win'):
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+import uvicorn
 
 if __name__ == "__main__":
-    # --- FIX CRÍTICO PARA WINDOWS ---
-    # Forza el uso de la política de bucle 'Selector' en lugar de 'Proactor'.
-    # Esto evita errores de "Socket Closed" y "WinError 10053" con MQTT/WebSockets.
-    if sys.platform.startswith('win'):
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-
+    print("🚀 Iniciando Servidor IoT...")
+    
     # Ejecutar Uvicorn programáticamente
+    # 'main:app' apunta a la instancia FastAPI en main.py
     uvicorn.run(
         "main:app", 
-        host="0.0.0.0", 
+        host="localhost", 
         port=8000, 
-        reload=True
+        reload=True,
+        log_level="info"
     )
