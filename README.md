@@ -1,50 +1,51 @@
-# Proyecto Final Integrador: Sistema Ciberfísico y Gemelo Digital
+# Final Integrative Project: Cyber-Physical System and Digital Twin
 
-Middleware IoT desarrollado en **Python (FastAPI)** que conecta un **prototipo físico (ESP32)** con un **Gemelo Digital en Unity**, utilizando **MQTT** para transmisión en tiempo real y **MongoDB** para almacenamiento histórico.
+IoT middleware developed in **Python (FastAPI)** that connects a **physical prototype (ESP32)** with a **Digital Twin in Unity**, using **MQTT**  for real-time
+transmission and **MongoDB** for historical storage.
 
-## 🚀 Instrucciones de Instalación y Ejecución
+## 🚀 Installation and Execution Instructions
 
-### 1. Configuración del Entorno Python
+### 1. Python Environment Setup
 
 ```
 python -m venv .venv
 .venv\Scripts\activate
 ```
 
-### 2. Infraestructura (Docker)
+### 2. Infrastructure (Docker)
 
 ```
 docker-compose up -d
 ```
 
-### 3. Instalación de Dependencias
+### 3. Dependency Installation
 
 ```
 pip install -r requirements.txt
 ```
 
-### 4. Ejecución del Middleware
+### 4.Middleware Execution
 
 ```
 cd src
 python run.py
 ```
 
-## 🧪 Herramientas de Simulación (Testing)
+## 🧪 Simulation Tools (Testing)
 
-### Simulador de Hardware (Mock ESP32)
+### Hardware Simulator (Mock ESP32)
 
 ```
-python mock_esp32.py
+python mock/mock_esp32.py
 ```
 
-### Visor Web (Mock Unity)
+### Web Viewer (Mock Unity)
 
-Abrir `mock/mock_unity.html`.
+Open `mock/mock_unity.html`.
 
-## 🔑 Credenciales y Puertos
+## 🔑 Credentials and Ports
 
-| Servicio   | Host      | Puerto | Usuario   | Contraseña |
+| Service    | Host      | Port   | User      | Password   |
 | ---------- | --------- | ------ | --------- | ---------- |
 | MongoDB    | localhost | 27017  | iot_admin | 940194     |
 | MQTT (TCP) | localhost | 1883   | (Anónimo) | -          |
