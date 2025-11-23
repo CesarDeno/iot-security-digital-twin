@@ -2,7 +2,12 @@
 <html lang="es">
    <head>
       <meta charset="UTF-8" />
-      <title>Panel de Seguridad (Gemelo Digital)</title>
+      <title>Panel de Seguridad (Cliente MQTT Directo)</title>
+      <!-- Librería Paho MQTT para conectar JS con Mosquitto -->
+      <script
+         src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"
+         type="text/javascript"
+      ></script>
       <style>
          body {
             font-family: "Segoe UI", sans-serif;
@@ -33,8 +38,6 @@
             text-transform: uppercase;
             letter-spacing: 1px;
          }
-
-         /* Estilos de Estado */
          .status-icon {
             font-size: 4em;
             margin: 10px 0;
@@ -61,8 +64,47 @@
          .closed {
             color: #00c851;
          }
+         .denied {
+            color: #ffbb33;
+            animation: shake 0.5s;
+         } /* Nuevo estilo para denegado */
 
-         /* Log */
+         @keyframes shake {
+            0% {
+               transform: translate(1px, 1px) rotate(0deg);
+            }
+            10% {
+               transform: translate(-1px, -2px) rotate(-1deg);
+            }
+            20% {
+               transform: translate(-3px, 0px) rotate(1deg);
+            }
+            30% {
+               transform: translate(3px, 2px) rotate(0deg);
+            }
+            40% {
+               transform: translate(1px, -1px) rotate(1deg);
+            }
+            50% {
+               transform: translate(-1px, 2px) rotate(-1deg);
+            }
+            60% {
+               transform: translate(-3px, 1px) rotate(0deg);
+            }
+            70% {
+               transform: translate(3px, 1px) rotate(-1deg);
+            }
+            80% {
+               transform: translate(-1px, -1px) rotate(1deg);
+            }
+            90% {
+               transform: translate(1px, 2px) rotate(0deg);
+            }
+            100% {
+               transform: translate(1px, -2px) rotate(-1deg);
+            }
+         }
+
          .log-container {
             width: 100%;
             max-width: 640px;
@@ -87,8 +129,11 @@
          .log-msg {
             color: #ddd;
          }
+         .denied-log {
+            color: #ffbb33;
+            font-weight: bold;
+         } /* Log rojo/naranja */
 
-         /* Controles */
          button {
             padding: 12px 24px;
             cursor: pointer;
@@ -102,26 +147,40 @@
          button:hover {
             background: #0099cc;
          }
+         .status-badge {
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            margin-bottom: 10px;
+            display: inline-block;
+         }
+         .connected {
+            background: #00c851;
+            color: white;
+         }
+         .disconnected {
+            background: #ff4444;
+            color: white;
+         }
       </style>
    </head>
    <body>
-      <h1>🛡️ Sistema de Control de Acceso</h1>
+      <h1>🛡️ Sistema de Control (MQTT Directo)</h1>
+
+      <div id="connectionStatus" class="status-badge disconnected">Desconectado</div>
 
       <div class="dashboard">
-         <!-- Gemelo Digital: Estado Puerta -->
          <div class="card">
             <h2>Estado de Puerta</h2>
             <div id="icon" class="status-icon closed">🔒</div>
             <div id="statusText" class="status-text closed">CERRADO</div>
             <div class="meta-info">ID: <span id="devId">--</span></div>
          </div>
-
-         <!-- Gemelo Digital: Último Acceso -->
          <div class="card">
-            <h2>Último Acceso</h2>
+            <h2>Último Evento</h2>
             <div style="font-size: 3em; margin: 10px 0">🔑</div>
-            <div id="method" class="status-text" style="color: #ffbb33">--</div>
-            <div class="meta-info">Método de entrada</div>
+            <div id="method" class="status-text" style="color: #bbb">--</div>
+            <div class="meta-info">Resultado Acceso</div>
          </div>
       </div>
 
@@ -137,72 +196,133 @@
          "
       >
          <h2>Acciones Remotas</h2>
-         <button onclick="sendCommand('FORCE_LOCK')">🔒 Bloquear Sistema</button>
-         <button onclick="sendCommand('FORCE_UNLOCK')" style="background: #ff4444">🔓 Desbloqueo de Emergencia</button>
+         <button onclick="publishCommand('FORCE_LOCK')">🔒 Bloquear</button>
+         <button onclick="publishCommand('FORCE_UNLOCK')" style="background: #ff4444">🔓 Desbloquear</button>
       </div>
 
-      <h3>Registro de Eventos en Tiempo Real</h3>
+      <h3>Log MQTT en Tiempo Real</h3>
       <div id="log" class="log-container"></div>
 
       <script>
-         const ws = new WebSocket("ws://127.0.0.1:8000/ws");
-         const logDiv = document.getElementById("log");
+         // CONFIGURACIÓN MQTT
+         const BROKER = "127.0.0.1";
+         const PORT = 9001; // Puerto WebSockets de Mosquitto
+         const TOPIC_TELEMETRY = "iot/telemetry";
+         const TOPIC_COMMANDS = "iot/commands";
 
-         // Elementos UI
+         const clientID = "unity_mock_" + Math.random().toString(16).substr(2, 8);
+         const client = new Paho.MQTT.Client(BROKER, PORT, clientID);
+
+         // UI Elements
+         const logDiv = document.getElementById("log");
          const uiIcon = document.getElementById("icon");
          const uiText = document.getElementById("statusText");
          const uiMethod = document.getElementById("method");
          const uiDevId = document.getElementById("devId");
+         const connStatus = document.getElementById("connectionStatus");
 
-         ws.onopen = () => log("✅ Conectado al Sistema de Seguridad");
-         ws.onclose = () => log("❌ Desconectado");
+         // Callbacks
+         client.onConnectionLost = onConnectionLost;
+         client.onMessageArrived = onMessageArrived;
 
-         ws.onmessage = (event) => {
-            const msg = JSON.parse(event.data);
+         // Conectar
+         log("Intentando conectar a MQTT Broker...");
+         client.connect({
+            onSuccess: onConnect,
+            onFailure: onFailure,
+            keepAliveInterval: 30,
+         });
 
-            if (msg.type === "sensor_update") {
-               const data = msg.payload;
+         function onConnect() {
+            log("✅ Conectado a Mosquitto (Port 9001)");
+            connStatus.innerText = "Conectado MQTT";
+            connStatus.className = "status-badge connected";
+            client.subscribe(TOPIC_TELEMETRY);
+         }
+
+         function onFailure(responseObject) {
+            log("❌ Fallo conexión: " + responseObject.errorMessage);
+            connStatus.innerText = "Error Conexión";
+         }
+
+         function onConnectionLost(responseObject) {
+            if (responseObject.errorCode !== 0) {
+               log("⚠️ Conexión perdida: " + responseObject.errorMessage);
+               connStatus.innerText = "Desconectado";
+               connStatus.className = "status-badge disconnected";
+            }
+         }
+
+         function onMessageArrived(message) {
+            const topic = message.destinationName;
+            const payload = message.payloadString;
+
+            if (topic === TOPIC_TELEMETRY) {
+               const data = JSON.parse(payload);
                updateDashboard(data);
 
-               // Log especial para eventos
-               if (data.door_status === "OPEN") {
-                  log(`⚠️ PUERTA ABIERTA vía [${data.access_method}]`);
+               // Logging inteligente según el resultado
+               if (data.access_granted === false) {
+                  logHtml(`<span class="denied-log">⚠️ ACCESO DENEGADO [${data.access_method}]</span>`);
+               } else if (data.door_status === "OPEN") {
+                  log(`🔓 PUERTA ABIERTA (${data.access_method})`);
                } else {
                   log(`🔒 Puerta cerrada`);
                }
             }
-         };
+         }
+
+         function publishCommand(action) {
+            if (client.isConnected()) {
+               const payload = JSON.stringify({ action: action });
+               message = new Paho.MQTT.Message(payload);
+               message.destinationName = TOPIC_COMMANDS;
+               client.send(message);
+               log(`📤 [CMD] Enviado: ${action}`);
+            } else {
+               log("⚠️ No se puede enviar: Cliente desconectado");
+            }
+         }
 
          function updateDashboard(data) {
             uiDevId.innerText = data.device_id;
 
-            if (data.door_status === "OPEN") {
+            // Lógica visual basada en access_granted
+            if (data.access_granted === false) {
+               // Caso: Acceso Denegado
+               uiIcon.innerText = "🚫";
+               uiIcon.className = "status-icon denied";
+               uiText.innerText = "DENEGADO";
+               uiText.className = "status-text denied";
+               uiMethod.innerText = data.access_method || "Intento Fallido";
+               uiMethod.style.color = "#ffbb33";
+            } else if (data.door_status === "OPEN") {
+               // Caso: Puerta Abierta
                uiIcon.innerText = "🔓";
                uiIcon.className = "status-icon open";
                uiText.innerText = "ABIERTO";
                uiText.className = "status-text open";
-               // Solo actualizamos el método si hay uno (al abrir)
-               if (data.access_method) uiMethod.innerText = data.access_method;
+               uiMethod.innerText = "Autorizado: " + (data.access_method || "Manual");
+               uiMethod.style.color = "#00C851";
             } else {
+               // Caso: Puerta Cerrada
                uiIcon.innerText = "🔒";
                uiIcon.className = "status-icon closed";
                uiText.innerText = "CERRADO";
                uiText.className = "status-text closed";
-               uiMethod.innerText = "--";
-            }
-         }
-
-         function sendCommand(action) {
-            if (ws.readyState === WebSocket.OPEN) {
-               ws.send(JSON.stringify({ action: action }));
-               log(`📤 Comando enviado: ${action}`);
+               uiMethod.innerText = "Esperando...";
+               uiMethod.style.color = "#666";
             }
          }
 
          function log(text) {
+            logHtml(`<span class="log-msg">${text}</span>`);
+         }
+
+         function logHtml(htmlContent) {
             const div = document.createElement("div");
             div.className = "log-entry";
-            div.innerHTML = `<span class="log-time">${new Date().toLocaleTimeString()}</span><span class="log-msg">${text}</span>`;
+            div.innerHTML = `<span class="log-time">${new Date().toLocaleTimeString()}</span>${htmlContent}`;
             logDiv.prepend(div);
          }
       </script>

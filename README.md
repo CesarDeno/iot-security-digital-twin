@@ -1,48 +1,58 @@
 # Proyecto Final Integrador: Sistema Ciberfísico y Gemelo Digital
 
-Middleware IoT desarrollado en **Python (FastAPI)** que conecta un
-prototipo físico (**ESP32**) con un **Gemelo Digital en Unity**,
-utilizando **MQTT** para transmisión en tiempo real y **MongoDB** para
-almacenamiento histórico.
-
-------------------------------------------------------------------------
+Middleware IoT desarrollado en **Python (FastAPI)** que conecta un **prototipo físico (ESP32)** con un **Gemelo Digital en Unity**, utilizando **MQTT** para transmisión en tiempo real y **MongoDB** para almacenamiento histórico.
 
 ## 🚀 Instrucciones de Instalación y Ejecución
 
 ### 1. Configuración del Entorno Python
 
-``` bash
-python -m venv .venv
 ```
-
-``` bash
+python -m venv .venv
 .venv\Scripts\activate
 ```
 
 ### 2. Infraestructura (Docker)
 
-``` bash
+```
 docker-compose up -d
 ```
 
 ### 3. Instalación de Dependencias
 
-``` bash
+```
 pip install -r requirements.txt
 ```
 
 ### 4. Ejecución del Middleware
 
-``` bash
+```
 cd src
-uvicorn main:app --reload 
+python run.py
 ```
 
-------------------------------------------------------------------------
+## 🧪 Herramientas de Simulación (Testing)
 
-## 🔗 Enlaces Útiles
+### Simulador de Hardware (Mock ESP32)
 
--   API Server: http://127.0.0.1:8000
--   Swagger: http://127.0.0.1:8000/docs
--   MongoDB Local: mongodb://localhost:27017
--   Broker MQTT: tcp://localhost:1883
+```
+python mock_esp32.py
+```
+
+### Visor Web (Mock Unity)
+
+Abrir `mock/mock_unity.html`.
+
+## 🔑 Credenciales y Puertos
+
+| Servicio   | Host      | Puerto | Usuario   | Contraseña |
+| ---------- | --------- | ------ | --------- | ---------- |
+| MongoDB    | localhost | 27017  | iot_admin | 940194     |
+| MQTT (TCP) | localhost | 1883   | (Anónimo) | -          |
+| MQTT (WS)  | localhost | 9001   | (Anónimo) | -          |
+| API REST   | localhost | 8000   | -         | -          |
+
+MongoDB Compass URI:
+
+```
+mongodb://iot_admin:940194@localhost:27017/?authSource=admin
+```

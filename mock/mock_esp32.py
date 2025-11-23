@@ -3,17 +3,12 @@ import json
 import random
 import os
 import uuid
-from pathlib import Path
 from gmqtt import Client as MQTTClient
 from dotenv import load_dotenv
 from datetime import datetime
 
-base_path = Path(__file__).resolve().parent.parent
-env_path = base_path / ".env"
-
-# Cargar variables desde el archivo .env
-load_dotenv(dotenv_path=env_path)
-
+# Cargar config
+load_dotenv()
 MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
 TOPIC_TELEMETRY = os.getenv("TOPIC_TELEMETRY", "iot/telemetry")
 TOPIC_COMMANDS = os.getenv("TOPIC_COMMANDS", "iot/commands")
@@ -29,7 +24,7 @@ def on_message(client, topic, payload, qos, properties):
     print(f"⚡ [COMANDO RECIBIDO]: {payload.decode()}")
 
 def on_disconnect(client, packet, exc=None):
-    print(f"⚠️ [DESCONECTADO] ({exc})")
+    print("⚠️ [DESCONECTADO] Conexión perdida con el Broker.")
 
 async def main():
     client = MQTTClient(CLIENT_ID)
@@ -44,47 +39,54 @@ async def main():
             await client.connect(MQTT_BROKER)
             
             while not STOP.is_set():
-                # Lógica de simulación
-                if door_is_open:
+                # --- Lógica de Simulación Mejorada ---
+                
+                # Probabilidad de intento fallido (ej. tarjeta inválida)
+                is_access_granted = random.random() > 0.1 # 90% éxito, 10% fallo
+
+                if not is_access_granted:
+                    # Intento fallido: La puerta NO cambia de estado, pero se registra el evento
+                    new_status = "CLOSED" 
+                    method = random.choice(["NFC", "CODE"])
+                    print(f"❌ ACCESO DENEGADO ({method})")
+                
+                elif door_is_open:
                     new_status = "CLOSED"
                     method = None
                     door_is_open = False
+                    is_access_granted = True # Cerrar siempre es autorizado
                     print("🔒 Puerta CERRADA")
                 else:
                     new_status = "OPEN"
-                    method = random.choice(["NFC", "KEYPAD"])
+                    method = random.choice(["NFC", "CODE"])
                     door_is_open = True
+                    is_access_granted = True
                     print(f"🔓 Puerta ABIERTA usando {method}")
 
                 data = {
                     "device_id": "access_control_01",
                     "door_status": new_status,
                     "access_method": method,
+                    "access_granted": is_access_granted,
                     "timestamp": datetime.now().isoformat()
                 }
                 
-                # --- FIX: Verificar conexión antes de publicar ---
                 if client.is_connected:
-                    try:
-                        client.publish(TOPIC_TELEMETRY, json.dumps(data), qos=0)
-                    except OSError:
-                        print("⚠️ Fallo al publicar (Socket cerrado), reconectando...")
-                        break # Rompe el bucle interno para reconectar
+                    client.publish(TOPIC_TELEMETRY, json.dumps(data), qos=0)
                 else:
-                    print("⏳ Esperando conexión para publicar...")
-                    break
+                    print("⏳ Esperando reconexión...")
+                    break 
 
                 await asyncio.sleep(random.randint(3, 8))
 
         except Exception as e:
-            print(f"❌ Error de conexión o Broker caído. Reintentando en 3s...")
+            print(f"🔄 Reintentando conexión en 3s...")
             await asyncio.sleep(3)
         finally:
-            # Limpieza segura
-            if client.is_connected:
+            if hasattr(client, 'is_connected') and client.is_connected:
                 try:
                     await client.disconnect()
-                except:
+                except Exception:
                     pass
 
 if __name__ == "__main__":
@@ -92,4 +94,4 @@ if __name__ == "__main__":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\n🛑 Detenido.")
+        print("\n🛑 Simulador detenido.")
