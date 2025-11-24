@@ -47,7 +47,7 @@ async def main():
                 if not is_access_granted:
                     # Intento fallido: La puerta NO cambia de estado, pero se registra el evento
                     new_status = "CLOSED" 
-                    method = random.choice(["NFC", "CODE"])
+                    method = random.choice(["rfid", "password"])
                     print(f"❌ ACCESO DENEGADO ({method})")
                 
                 elif door_is_open:
@@ -57,8 +57,8 @@ async def main():
                     is_access_granted = True # Cerrar siempre es autorizado
                     print("🔒 Puerta CERRADA")
                 else:
-                    new_status = "OPEN"
-                    method = random.choice(["NFC", "CODE"])
+                    new_status = "OPENED"
+                    method = random.choice(["rfid", "password"])
                     door_is_open = True
                     is_access_granted = True
                     print(f"🔓 Puerta ABIERTA usando {method}")

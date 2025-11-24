@@ -196,8 +196,7 @@
          "
       >
          <h2>Acciones Remotas</h2>
-         <button onclick="publishCommand('FORCE_LOCK')">🔒 Bloquear</button>
-         <button onclick="publishCommand('FORCE_UNLOCK')" style="background: #ff4444">🔓 Desbloquear</button>
+         <button onclick="publishCommand('open')" style="background: #ff4444">🔓 Desbloquear</button>
       </div>
 
       <h3>Log MQTT en Tiempo Real</h3>
@@ -275,6 +274,7 @@
          function publishCommand(action) {
             if (client.isConnected()) {
                const payload = JSON.stringify({ action: action });
+               console.log(payload);
                message = new Paho.MQTT.Message(payload);
                message.destinationName = TOPIC_COMMANDS;
                client.send(message);

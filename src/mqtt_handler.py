@@ -38,8 +38,8 @@ async def message(client, topic, payload, qos, properties):
             
             data_json = json.loads(payload_str)
             
-            if "timestamp" not in data_json:
-                data_json["timestamp"] = datetime.now()
+            if not data_json.get("timestamp"):
+                data_json["timestamp"] = datetime.now().isoformat() 
 
             await save_sensor_data(data_json)
 
